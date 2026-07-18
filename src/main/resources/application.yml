@@ -42,12 +42,6 @@ async:
   max-pool-size: 5
   queue-capacity: 50
 
-# Original gsma_connector config - commented out
-# gsma_connector:
-#   contactpoint: "https://ams-mifos.sandbox.fynarfin.io"
-#   endpoint:
-#     account-status: "/ams/accounts/identifierType/identifierId/status"
-
 # gazelle gsma_connector config internal to cluster
 gsma_connector:
   contactpoint: "http://ph-ee-connector-ams-mifos"
@@ -68,8 +62,6 @@ zeebe:
     max-execution-threads: 50
     evenly-allocated-max-jobs: 100
     poll-interval: 10
-  #    number-of-workers: 15
-  #    evenly-allocated-max-jobs: "#{${zeebe.client.max-execution-threads} / ${zeebe.client.number-of-workers}}"
   broker:
     contactpoint: "zeebe-zeebe-gateway:26500"
 
