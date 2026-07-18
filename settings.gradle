@@ -1,1 +1,5 @@
 rootProject.name = 'paymenthub-ee-account-mapper'
+
+// validator = the former ph-ee-id-account-validator-impl repo, merged into
+// this repo as a library module (it was used only by this service).
+include 'validator'

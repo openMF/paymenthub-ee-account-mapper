@@ -60,8 +60,9 @@ dependencies {
     // Ehcache 2 + JCache replaced by Caffeine (see CacheConfig): Spring 6
     // removed EhCacheCacheManager and net.sf.ehcache is pre-Jakarta.
     implementation 'com.github.ben-manes.caffeine:caffeine'
-    // implementation 'org.mifos:ph-ee-id-account-validator-impl:0.0.6-SNAPSHOT'
-    implementation 'org.mifos:ph-ee-id-account-validator-impl:0.0.1-gazelle'
+    // Former dependency: org.mifos:ph-ee-id-account-validator-impl (published
+    // jar). The same code now lives in this repo as the validator module.
+    implementation project(':validator')
     implementation 'io.camunda:zeebe-client-java'
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
 }

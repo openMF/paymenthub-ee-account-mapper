@@ -1,0 +1,47 @@
+// validator module: the former ph-ee-id-account-validator-impl repo, merged
+// into this repo per the repo-consolidation plan. It was a single-consumer
+// published dependency, used only by the identity account mapper, so it now
+// lives here as a plain library module instead of a separate artifact.
+plugins {
+    id 'java'
+    id 'org.springframework.boot'
+    id 'io.spring.dependency-management'
+    id 'eclipse'
+}
+
+sourceCompatibility = JavaVersion.VERSION_21
+targetCompatibility = JavaVersion.VERSION_21
+
+repositories {
+    mavenCentral()
+    maven { url "https://mifos.jfrog.io/artifactory/phee-gradle-local" }
+    maven { url "https://mifos.jfrog.io/artifactory/mifosx-gradle-local" }
+}
+
+dependencies {
+    // Use platform() (not enforcedPlatform): this is a library module, and
+    // enforced platforms leak forced versions into downstream metadata.
+    implementation platform('org.mifos:paymenthub-ee-bom:2.0.0-SNAPSHOT')
+
+    implementation 'org.springframework.boot:spring-boot-starter'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    implementation 'io.rest-assured:rest-assured'
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
+    implementation 'io.camunda:zeebe-client-java'
+    implementation 'org.mifos:paymenthub-ee-core:2.0.0-SNAPSHOT'
+    implementation 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+}
+
+// This is a library, not an executable Spring Boot app: the plain jar is what
+// the root application consumes via project(':validator').
+tasks.named('bootJar') { enabled = false }
+tasks.named('jar') { enabled = true; archiveClassifier = '' }
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
