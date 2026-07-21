@@ -27,20 +27,16 @@ public class GSMAAccountValidation extends AccountValidationService {
         //accountStatusEndpoint = accountStatusEndpoint.replaceAll("identifierId", financialAddress);
         accountStatusEndpoint = accountStatusEndpoint.replaceAll("identifierId", payeeIdentity);
         RequestSpecification requestSpec = new RequestSpecBuilder().build();
-        log.info("TDDEBUG> GSMA Connector Contact Point: " + gsmaConnectorContactPoint);
-        log.info("TDDEBUG> GSMA Account Status Endpoint: " + accountStatusEndpoint);
         requestSpec.relaxedHTTPSValidation();
 
         Response response = RestAssured.given(requestSpec)
                 .baseUri(gsmaConnectorContactPoint)
                 .header("Platform-TenantId", tenant)
-                .log().all() // <-- Log the request details here
                 .when()
                 .get(accountStatusEndpoint)
                 .andReturn();
         Integer statusCode = response.then().extract().statusCode();
         String responseBody = response.then().extract().body().asString();
-        log.info("TDDEBUG responseBody is {} " , responseBody ); 
         ObjectMapper objectMapper = new ObjectMapper();
         Map<String, String> responseMap = null;
         try {

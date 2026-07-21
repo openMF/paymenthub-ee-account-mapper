@@ -46,8 +46,6 @@ public class AccountLookupCallbackController implements AccountLookupCallback {
         String error = null;
         String transactionId = null;
         AccountLookupResponseDTO accountLookupResponseDTO = null;
-        log.info("TDDEBUG> Inside account lookup CALLBACK controller");
-        log.info("TDDEBUG> requestBody: " + requestBody);
         try {
             logger.info(requestBody);
             accountLookupResponseDTO = objectMapper.readValue(requestBody, AccountLookupResponseDTO.class);
@@ -56,7 +54,6 @@ public class AccountLookupCallbackController implements AccountLookupCallback {
             variables.put(PAYEE_PARTY_ID_TYPE, accountLookupResponseDTO.getPaymentModalityList().get(0).getPaymentModality());
             variables.put(PARTY_LOOKUP_FSP_ID, accountLookupResponseDTO.getPaymentModalityList().get(0).getBankingInstitutionCode());
             transactionId = accountLookupResponseDTO.getRequestId();
-            log.info("TDDEBUG> transactionId: " + transactionId);
             log.info("variables set: " + variables.toString());
             Boolean isValidated = accountLookupResponseDTO.getIsValidated();
             if (!isValidated) {
@@ -81,25 +78,12 @@ public class AccountLookupCallbackController implements AccountLookupCallback {
         Map<String, Object> variables = new HashMap<>();
         String error = null;
         String transactionId = null;
-        log.info("=== BATCH ACCOUNT LOOKUP CALLBACK DEBUG ===");
-        log.info("Request body length: {} chars", requestBody != null ? requestBody.length() : 0);
-        log.info("Request body: {}", requestBody);
         BatchAccountLookupResponseDTO batchAccountLookupResponseDTO = null;
         try {
             batchAccountLookupResponseDTO = objectMapper.readValue(requestBody, BatchAccountLookupResponseDTO.class);
-            log.info("Parsed response - Request ID: {}", batchAccountLookupResponseDTO.getRequestID());
-            log.info("Number of beneficiaries in response: {}",
-                    batchAccountLookupResponseDTO.getBeneficiaryDTOList() != null
-                            ? batchAccountLookupResponseDTO.getBeneficiaryDTOList().size()
-                            : 0);
-            if (batchAccountLookupResponseDTO.getBeneficiaryDTOList() != null
-                    && !batchAccountLookupResponseDTO.getBeneficiaryDTOList().isEmpty()) {
-                log.info("First beneficiary in response: {}", batchAccountLookupResponseDTO.getBeneficiaryDTOList().get(0));
-            }
             variables.put("batchAccountLookupCallback", requestBody);
             transactionId = batchAccountLookupResponseDTO.getRequestID();
             variables.put("cachedTransactionId", transactionId);
-            log.info("Sending to Zeebe with correlation key: {}", transactionId);
         } catch (Exception e) {
             log.error("ERROR parsing batch account lookup response", e);
             logger.error(e.getMessage());
@@ -111,7 +95,6 @@ public class AccountLookupCallbackController implements AccountLookupCallback {
 
             zeebeClient.newPublishMessageCommand().messageName(BATCH_ACCOUNT_LOOKUP_RESPONSE).correlationKey(transactionId)
                     .timeToLive(Duration.ofMillis(50000)).variables(variables).send();
-            log.info("Message sent to Zeebe successfully");
         } else {
             log.warn("ZeebeClient is null, cannot send message!");
         }

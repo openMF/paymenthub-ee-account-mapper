@@ -26,21 +26,6 @@ public class BatchAccountLookupApiController implements BatchAccountLookupApi {
     @Override
     public ResponseEntity<ResponseDTO> batchAccountLookup(String callbackURL, RequestDTO requestDTO, String registeringInstitutionId)
             throws ExecutionException, InterruptedException {
-        log.info("=== IDENTITY MAPPER BATCH LOOKUP DEBUG ===");
-        log.info("Callback URL: {}", callbackURL);
-        log.info("Request ID: {}", requestDTO.getRequestID());
-        log.info("Registering Institution ID: {}", registeringInstitutionId);
-        log.info("SourceBBID: {}", requestDTO.getSourceBBID());
-        log.info("Number of beneficiaries in request: {}",
-                requestDTO.getBeneficiaries() != null ? requestDTO.getBeneficiaries().size() : 0);
-        if (requestDTO.getBeneficiaries() != null && !requestDTO.getBeneficiaries().isEmpty()) {
-            log.info("First beneficiary: {}", requestDTO.getBeneficiaries().get(0));
-            log.info(
-                    "First beneficiary details - payeeIdentity: '{}', paymentModality: '{}', financialAddress: '{}', bankingInstitutionCode: '{}'",
-                    requestDTO.getBeneficiaries().get(0).getPayeeIdentity(), requestDTO.getBeneficiaries().get(0).getPaymentModality(),
-                    requestDTO.getBeneficiaries().get(0).getFinancialAddress(),
-                    requestDTO.getBeneficiaries().get(0).getBankingInstitutionCode());
-        }
         try {
             accountLookupService.batchAccountLookup(callbackURL, requestDTO.getRequestID(), requestDTO.getBeneficiaries(),
                     registeringInstitutionId);

@@ -28,7 +28,6 @@ public class RegisterBeneficiaryApiController implements RegisterBeneficiaryApi 
     @Override
     public <T> ResponseEntity<T> registerBeneficiary(String callbackURL, String registeringInstitutionId, RequestDTO requestBody)
             throws ExecutionException, InterruptedException, JsonProcessingException {
-        log.info("TDDEBUG> Inside beneficiary lookup controller ");
         try {
             PhErrorDTO phErrorDTO = registerBeneficiaryService.registerBeneficiary(callbackURL, requestBody, registeringInstitutionId);
             if (phErrorDTO != null) {

@@ -28,11 +28,7 @@ public class AccountLookupApiController implements AccountLookupApi {
     @Override
     public <T> ResponseEntity<T> accountLookup(String callbackURL, String payeeIdentity, String paymentModality, String requestId,
             String registeringInstitutionId) {
-        log.info("TDDEBUG> Inside account lookup API controller");
         try {
-            log.info("TDDEBUG> Calling account lookup service from API controller callbackURL: " + callbackURL + ", payeeIdentity: "
-                    + payeeIdentity + ", paymentModality: " + paymentModality + ", requestId: " + requestId + ", registeringInstitutionId: "
-                    + registeringInstitutionId);
             accountLookupService.accountLookup(callbackURL, payeeIdentity, paymentModality, requestId, registeringInstitutionId);
         } catch (Exception e) {
             ResponseDTO responseDTO = new ResponseDTO(FAILED_RESPONSE_CODE.getValue(), FAILED_RESPONSE_MESSAGE.getValue(), requestId);

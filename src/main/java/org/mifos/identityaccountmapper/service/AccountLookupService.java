@@ -109,12 +109,9 @@ public class AccountLookupService {
     @Async("asyncExecutor")
     public void accountLookup(String callbackURL, String payeeIdentity, String paymentModality, String requestId,
             String registeringInstitutionId) {
-        log.info("TDDEBUG> Before database lookup payeeIdentity: " + payeeIdentity + ", paymentModality: " + paymentModality
-                + ", registeringInstitutionId: " + registeringInstitutionId);
         IdentityDetails identityDetails = masterRepository
                 .findByPayeeIdentityAndRegisteringInstitutionId(payeeIdentity, registeringInstitutionId)
                 .orElseThrow(() -> PayeeIdentityException.payeeIdentityNotFound(payeeIdentity));
-        log.info("TDDEBUG> Identity details found in idam database  " + identityDetails.toString());
         if (!identityDetails.getRegisteringInstitutionId().matches(registeringInstitutionId)) {
             sendCallbackService.sendCallback("Registering Institution Id is not mapped to the Payee Identity provided in the request.",
                     callbackURL);
@@ -169,9 +166,6 @@ public class AccountLookupService {
             return false;
         }
 
-        // log.info("TDDEBUG> Account validation result: " + accountValidate);
-        // log.info("TDDEBUG> about to send account callback to Callback URL: " + callbackURL);
-        // sendAccountLookupCallback(callbackURL, accountValidate, payeeIdentity, requestId, registeringInstitutionId);
         return true;
     }
 
