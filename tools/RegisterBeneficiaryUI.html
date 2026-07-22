@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Beneficiary Registration | ID Mapper</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+<style>
+:root {
+    --primary:#004989;
+    --accent:#b4d575;
+    --error:#d32f2f;
+    --light:#f5f5f5;
+    --mid:#d7dada;
+    --dark:#353b3b;
+    --white:#fff;
+}
+
+* { box-sizing:border-box; margin:0; padding:0; }
+
+body {
+    font-family:Roboto,sans-serif;
+    background:var(--light);
+    padding:20px;
+    color:var(--dark);
+}
+
+.container {
+    max-width:900px;
+    margin:auto;
+    background:var(--white);
+    border:1px solid var(--mid);
+    border-radius:4px;
+}
+
+.header {
+    background:var(--primary);
+    color:#fff;
+    padding:20px;
+}
+
+.header h1 { font-size:1.5rem; font-weight:500; }
+.header p { font-size:0.8rem; opacity:0.9; }
+
+.content { padding:20px; }
+
+.config-section {
+    background:#f0f4f8;
+    border-left:4px solid var(--primary);
+    padding:20px;
+    margin-bottom:25px;
+}
+
+.config-grid {
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:15px;
+}
+
+.form-section {
+    border:1px solid var(--mid);
+    padding:20px;
+    margin-bottom:20px;
+    border-radius:4px;
+}
+
+.section-header {
+    display:flex;
+    justify-content:space-between;
+    border-bottom:1px solid var(--mid);
+    padding-bottom:10px;
+    margin-bottom:15px;
+}
+
+label {
+    font-size:0.8rem;
+    font-weight:500;
+    margin-bottom:4px;
+    display:block;
+}
+
+input,select {
+    width:100%;
+    padding:10px;
+    border:1px solid var(--mid);
+    border-radius:2px;
+}
+
+input.error { border-color:var(--error); background:#fff7f7; }
+
+.error-message {
+    font-size:0.7rem;
+    color:var(--error);
+    display:none;
+}
+
+.error-message.show { display:block; }
+
+.required { color:var(--error); }
+
+.button-group {
+    display:flex;
+    gap:15px;
+    margin-top:20px;
+}
+
+button {
+    padding:12px 20px;
+    font-weight:500;
+    border:none;
+    border-radius:2px;
+    cursor:pointer;
+}
+
+.add-btn { background:var(--accent); }
+.submit-btn { background:var(--primary); color:#fff; flex:1; }
+.remove-btn {
+    background:none;
+    color:var(--error);
+    border:1px solid var(--error);
+    font-size:0.7rem;
+    padding:4px 8px;
+}
+
+.response-area {
+    display:none;
+    border:1px solid var(--mid);
+    margin-top:20px;
+}
+
+.response-area.show { display:block; }
+
+.response-area h3 {
+    font-size:0.8rem;
+    background:#eee;
+    padding:10px;
+}
+
+pre {
+    padding:15px;
+    background:#fafafa;
+    font-size:12px;
+    overflow-x:auto;
+}
+
+.success { border-left:5px solid var(--accent); }
+.error-response { border-left:5px solid var(--error); }
+</style>
+</head>
+
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>ID Account Mapper</h1>
+        <p>Beneficiary Registration (POC)</p>
+    </div>
+
+    <div class="content">
+
+        <!-- CONFIGURATION -->
+        <div class="config-section">
+            <label style="color:var(--primary);">SYSTEM CONFIGURATION</label>
+            <div class="config-grid">
+                <div>
+                    <label>API Gateway URL <span class="required">*</span></label>
+                    <input id="apiUrl" value="http://localhost:8081">
+                </div>
+                <div>
+                    <label>Callback URL <span class="required">*</span></label>
+                    <input id="callbackUrl" value="https://webhook.site/xxxx">
+                </div>
+                <div>
+                    <label>Institution Programme ID <span class="required">*</span></label>
+                    <input id="registeringInstitutionId" value="INST12345678">
+                </div>
+                <div>
+                    <label>Source BBID <span class="required">*</span></label>
+                    <input id="sourceBBID" value="TEST_SOURCE">
+                </div>
+            </div>
+        </div>
+
+        <!-- BENEFICIARIES -->
+        <div id="beneficiariesContainer"></div>
+
+        <!-- ACTIONS -->
+        <div class="button-group">
+            <button class="add-btn" onclick="addBeneficiary()">+ Add Record</button>
+            <button class="submit-btn" onclick="submitRegistration()">Submit Registration</button>
+        </div>
+
+        <!-- RESPONSE -->
+        <div id="responseArea" class="response-area">
+            <h3>SYSTEM RESPONSE</h3>
+            <pre id="responseContent"></pre>
+        </div>
+
+    </div>
+</div>
+
+<script>
+
+function generateRequestId() {
+    return Math.floor(Math.random() * 1e12).toString().padStart(12,'0');
+}
+function addBeneficiary() {
+    const container = document.getElementById('beneficiariesContainer');
+
+    const index = container.querySelectorAll('.form-section').length + 1;
+
+    const div = document.createElement('div');
+    div.className = 'form-section';
+
+    div.innerHTML = `
+        <div class="section-header">
+            <strong>RECORD #${index}</strong>
+            <button class="remove-btn" onclick="removeBeneficiary(this)">REMOVE</button>
+        </div>
+
+        <div class="config-grid">
+            <div>
+                <label>Payee Identity <span class="required">*</span></label>
+                <input class="payee">
+                <div class="error-message">Required</div>
+            </div>
+            <div>
+                <label>Payment Modality</label>
+                <select class="modality">
+                    <option value="">-- Select --</option>
+                    <option value="00">Bank</option>
+                    <option value="01">Mobile Money</option>
+                    <option value="02">Voucher</option>
+                    <option value="03">Wallet</option>
+                </select>
+            </div>
+            <div>
+                <label>Financial Address</label>
+                <input class="address">
+            </div>
+            <div>
+                <label>Banking Institution Code</label>
+                <input class="bbic">
+            </div>
+        </div>
+    `;
+
+    container.appendChild(div);
+}
+
+function removeBeneficiary(btn) {
+    btn.closest('.form-section').remove();
+    renumberRecords();
+}
+
+function renumberRecords() {
+    document.querySelectorAll('.form-section').forEach((section, index) => {
+        section.querySelector('.section-header strong').textContent =
+            `RECORD #${index + 1}`;
+    });
+}
+
+function validate() {
+    let ok = true;
+    document.querySelectorAll('.form-section').forEach(s => {
+        const p = s.querySelector('.payee');
+        const e = s.querySelector('.error-message');
+        if (!p.value.trim()) {
+            p.classList.add('error');
+            e.classList.add('show');
+            ok = false;
+        } else {
+            p.classList.remove('error');
+            e.classList.remove('show');
+        }
+    });
+    ['apiUrl','callbackUrl','registeringInstitutionId','sourceBBID'].forEach(id=>{
+        if(!document.getElementById(id).value.trim()) ok=false;
+    });
+    return ok;
+}
+
+async function submitRegistration() {
+    if (!validate()) {
+        alert('Please complete required fields');
+        return;
+    }
+
+    const payload = {
+        requestID: generateRequestId(),
+        sourceBBID: sourceBBID.value.trim(),
+        beneficiaries: [...document.querySelectorAll('.form-section')].map(s => {
+            const r = { payeeIdentity: s.querySelector('.payee').value.trim() };
+            if (s.querySelector('.modality').value) r.paymentModality = s.querySelector('.modality').value;
+            if (s.querySelector('.address').value.trim()) r.financialAddress = s.querySelector('.address').value.trim();
+            if (s.querySelector('.bbic').value.trim()) r.bankingInstitutionCode = s.querySelector('.bbic').value.trim();
+            return r;
+        })
+    };
+
+    try {
+        const res = await fetch(`${apiUrl.value}/beneficiary`, {
+            method:'POST',
+            headers:{
+                'Content-Type':'application/json',
+                'X-CallbackURL':callbackUrl.value,
+                'X-Registering-Institution-ID':registeringInstitutionId.value
+            },
+            body:JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+    alert('Request received successfully');
+    document.getElementById('responseArea').style.display = 'none';
+} else {
+    const error = await res.text();
+    alert('Request failed: ' + error);
+}
+    } catch (e) {
+        responseContent.textContent = JSON.stringify({error:e.message},null,2);
+        responseArea.className = 'response-area show error-response';
+    }
+
+    window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'});
+}
+
+window.onload = addBeneficiary;
+</script>
+
+</body>
+</html>
