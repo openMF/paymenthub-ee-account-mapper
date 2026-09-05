@@ -44,7 +44,7 @@ async:
 
 # gazelle gsma_connector config internal to cluster
 gsma_connector:
-  contactpoint: "http://ph-ee-connector-ams-mifos"
+  contactpoint: "http://paymenthub-ee-connector-ams-mifosx"
   endpoint:
     account-status: "/ams/accounts/identifierType/identifierId/status"
 
