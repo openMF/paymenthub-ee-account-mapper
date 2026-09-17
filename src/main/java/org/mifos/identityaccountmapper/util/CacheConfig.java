@@ -2,7 +2,7 @@ package org.mifos.identityaccountmapper.util;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
 import java.time.Duration;
-import org.springframework.beans.factory.annotation.Value;
+import org.mifos.identityaccountmapper.config.AccountLookupCacheProperties;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
@@ -19,18 +19,11 @@ import org.springframework.context.annotation.Configuration;
 @EnableCaching
 public class CacheConfig {
 
-    @Value("${spring.cache.time_to_live}")
-    private Integer ttl;
-    @Value("${spring.cache.time_to_idle}")
-    private Integer tti;
-    @Value("${spring.cache.max_entries_heap}")
-    private Integer maxEntriesHeap;
-
     @Bean
-    public CacheManager cacheManager() {
+    public CacheManager cacheManager(AccountLookupCacheProperties properties) {
         CaffeineCacheManager cacheManager = new CaffeineCacheManager("accountLookupCache");
-        cacheManager.setCaffeine(Caffeine.newBuilder().expireAfterWrite(Duration.ofSeconds(ttl)).expireAfterAccess(Duration.ofSeconds(tti))
-                .maximumSize(maxEntriesHeap));
+        cacheManager.setCaffeine(Caffeine.newBuilder().expireAfterWrite(Duration.ofSeconds(properties.timeToLive()))
+                .expireAfterAccess(Duration.ofSeconds(properties.timeToIdle())).maximumSize(properties.maxEntriesHeap()));
         return cacheManager;
     }
 }

@@ -10,13 +10,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
-import org.mifos.identityaccountmapper.data.AccountLookupResponseDTO;
+import org.mifos.identityaccountmapper.config.LookupProperties;
 import org.mifos.identityaccountmapper.data.BatchAccountLookupResponseDTO;
 import org.mifos.identityaccountmapper.data.BeneficiaryDTO;
 import org.mifos.identityaccountmapper.domain.IdentityDetails;
 import org.mifos.identityaccountmapper.domain.PaymentModalityDetails;
 import org.mifos.identityaccountmapper.exception.PayeeIdentityException;
-import org.mifos.identityaccountmapper.repository.ErrorTrackingRepository;
 import org.mifos.identityaccountmapper.repository.MasterRepository;
 import org.mifos.identityaccountmapper.repository.PaymentModalityRepository;
 import org.mifos.pheeidaccountvalidatorimpl.service.AccountValidationService;
@@ -24,9 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
-import org.springframework.data.util.Pair;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -35,17 +32,11 @@ import org.springframework.stereotype.Service;
 public class AccountLookupService {
 
     private final MasterRepository masterRepository;
-    private final ErrorTrackingRepository errorTrackingRepository;
     private final PaymentModalityRepository paymentModalityRepository;
     private final SendCallbackService sendCallbackService;
     private final ObjectMapper objectMapper;
     private final AccountLookupReadService accountLookupReadService;
-    @Value("${account_validation_enabled}")
-    private Boolean accountValidationEnabled;
-    @Value("${account_validator_connector}")
-    private String accountValidatorConnector;
-    @Value("${callback_enabled}")
-    private Boolean callbackEnabled;
+    private final LookupProperties lookupProperties;
     @Autowired
     private ApplicationContext applicationContext;
 
@@ -53,15 +44,15 @@ public class AccountLookupService {
     private final Set<String> paymentModalityCodes = new HashSet<>(Set.of("00", "01", "02"));
 
     @Autowired
-    public AccountLookupService(MasterRepository masterRepository, ErrorTrackingRepository errorTrackingRepository,
-            PaymentModalityRepository paymentModalityRepository, SendCallbackService sendCallbackService, ObjectMapper objectMapper,
-            AccountLookupReadService accountLookupReadService) {
+    public AccountLookupService(MasterRepository masterRepository, PaymentModalityRepository paymentModalityRepository,
+            SendCallbackService sendCallbackService, ObjectMapper objectMapper, AccountLookupReadService accountLookupReadService,
+            LookupProperties lookupProperties) {
         this.masterRepository = masterRepository;
-        this.errorTrackingRepository = errorTrackingRepository;
         this.paymentModalityRepository = paymentModalityRepository;
         this.sendCallbackService = sendCallbackService;
         this.objectMapper = objectMapper;
         this.accountLookupReadService = accountLookupReadService;
+        this.lookupProperties = lookupProperties;
     }
 
     @Async("asyncExecutor")
@@ -77,10 +68,11 @@ public class AccountLookupService {
                 PaymentModalityDetails paymentModalityDetails = paymentModalityRepository.findByMasterId(identityDetails.getMasterId())
                         .get(0);
 
-                if (accountValidationEnabled) {
+                if (lookupProperties.accountValidationEnabled()) {
                     AccountValidationService accountValidationService = null;
                     try {
-                        accountValidationService = (AccountValidationService) this.applicationContext.getBean(accountValidatorConnector);
+                        accountValidationService = (AccountValidationService) this.applicationContext
+                                .getBean(lookupProperties.accountValidatorConnector());
                     } catch (NoSuchBeanDefinitionException ex) {
                         // Handle the case when the bean is not found in the application context
                     }
@@ -122,25 +114,6 @@ public class AccountLookupService {
         sendAccountLookupCallback(callbackURL, accountValidate, payeeIdentity, requestId, registeringInstitutionId);
     }
 
-    public Pair<Boolean, AccountLookupResponseDTO> syncAccountLookup(String callbackURL, String payeeIdentity, String paymentModality,
-            String requestId, String registeringInstitutionId) throws JsonProcessingException {
-        logger.info("Inside sync account lookup");
-        IdentityDetails identityDetails = masterRepository
-                .findByPayeeIdentityAndRegisteringInstitutionId(payeeIdentity, registeringInstitutionId)
-                .orElseThrow(() -> PayeeIdentityException.payeeIdentityNotFound(payeeIdentity));
-        if (!identityDetails.getRegisteringInstitutionId().matches(registeringInstitutionId)) {
-            sendCallbackService.sendCallback("Registering Institution Id is not mapped to the Payee Identity provided in the request.",
-                    callbackURL);
-            return Pair.of(false, null);
-        }
-        logger.info("Before helper function");
-        boolean accountValidate = accountlookupHelper(callbackURL, payeeIdentity, paymentModality, identityDetails);
-        AccountLookupResponseDTO responseDTO = accountLookupReadService.lookup(payeeIdentity, callbackURL, requestId,
-                registeringInstitutionId, accountValidate);
-        logger.info(objectMapper.writeValueAsString(responseDTO));
-        return Pair.of(accountValidate, responseDTO);
-    }
-
     public boolean accountlookupHelper(String callbackURL, String payeeIdentity, String paymentModality, IdentityDetails identityDetails) {
 
         PaymentModalityDetails paymentModalityDetails = paymentModalityRepository.findByMasterId(identityDetails.getMasterId()).get(0);
@@ -151,9 +124,10 @@ public class AccountLookupService {
 
         AccountValidationService accountValidationService;
         try {
-            accountValidationService = (AccountValidationService) this.applicationContext.getBean(accountValidatorConnector);
+            accountValidationService = (AccountValidationService) this.applicationContext
+                    .getBean(lookupProperties.accountValidatorConnector());
         } catch (NoSuchBeanDefinitionException ex) {
-            logger.error("AccountValidationService bean not found: {}", accountValidatorConnector, ex);
+            logger.error("AccountValidationService bean not found: {}", lookupProperties.accountValidatorConnector(), ex);
             return false;
         }
 
