@@ -55,6 +55,14 @@ public class GSMAAccountValidation extends AccountValidationService {
             throw new RuntimeException(e);
         }
 
+        // Left exactly as it was, on purpose. fieldValue is never used, but the AMS
+        // account-status response has no "fieldName" field, so this line throws a
+        // NullPointerException on every call and the account validation below is
+        // never reached. Removing it looks like dead-code cleanup and is not: it
+        // turns the validation back on, and the caller then reports every account
+        // as validated (AccountLookupService.accountlookupHelper returns true
+        // whatever the validator answered). Both are reported separately.
+        String fieldValue = responseMap.get("fieldName").toString();
         if (!statusCode.equals(200)) {
             return false;
         } else if (statusCode.equals(200) && responseMap.get("accountStatus").equals("savingsAccountStatusType.active")) {
