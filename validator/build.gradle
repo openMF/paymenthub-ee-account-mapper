@@ -25,7 +25,9 @@ dependencies {
 
     implementation 'org.springframework.boot:spring-boot-starter'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    implementation 'io.rest-assured:rest-assured'
+    // spring-web, not the rest-assured that used to be here: the outgoing call
+    // now goes through the RestClient bean the application builds.
+    implementation 'org.springframework:spring-web'
     implementation 'com.fasterxml.jackson.core:jackson-databind'
     implementation 'io.camunda:zeebe-client-java'
     implementation 'org.mifos:paymenthub-ee-core:2.0.0-SNAPSHOT'

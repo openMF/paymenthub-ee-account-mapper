@@ -51,7 +51,6 @@ dependencies {
     // mysql:mysql-connector-java was relocated to com.mysql:mysql-connector-j
     implementation 'com.mysql:mysql-connector-j'
     implementation 'com.zaxxer:HikariCP'
-    implementation 'io.rest-assured:rest-assured'
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui'
     implementation 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'

@@ -1,10 +1,6 @@
 package org.mifos.identityaccountmapper.service;
 
-import io.restassured.RestAssured;
-import io.restassured.builder.RequestSpecBuilder;
-import io.restassured.http.ContentType;
-import io.restassured.response.Response;
-import io.restassured.specification.RequestSpecification;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import org.mifos.identityaccountmapper.data.CallbackRequestDTO;
@@ -13,25 +9,40 @@ import org.mifos.identityaccountmapper.domain.ErrorTracking;
 import org.mifos.identityaccountmapper.util.UniqueIDGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpRequest;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
 
 @Service
 public class SendCallbackService {
 
     private static final Logger logger = LoggerFactory.getLogger(SendCallbackService.class);
 
+    private final RestClient restClient;
+
+    public SendCallbackService(RestClient restClient) {
+        this.restClient = restClient;
+    }
+
     public void sendCallback(String body, String callbackURL) {
         logger.debug(body);
         logger.debug(callbackURL);
-        RequestSpecification requestSpec = new RequestSpecBuilder().build();
-        requestSpec.relaxedHTTPSValidation();
-        Response response = RestAssured.given(requestSpec).baseUri(callbackURL).header("Content-Type", ContentType.JSON).body(body).when()
-                .put();
+        ResponseEntity<String> response = restClient.put().uri(URI.create(callbackURL)).contentType(MediaType.APPLICATION_JSON).body(body)
+                .retrieve().onStatus(status -> true, SendCallbackService::keepTheResponse).toEntity(String.class);
 
-        String responseBody = response.getBody().asString();
-        logger.debug(responseBody);
-        int responseCode = response.getStatusCode();
-        logger.debug(String.valueOf(responseCode));
+        logger.debug(response.getBody());
+        logger.debug(String.valueOf(response.getStatusCode().value()));
+    }
+
+    /**
+     * Keeps the old behaviour: RestAssured did not throw on a 4xx or 5xx either, it handed the response back and the
+     * caller decided. Without this, RestClient would throw instead.
+     */
+    private static void keepTheResponse(HttpRequest request, ClientHttpResponse response) {
+        // deliberately nothing
     }
 
     public CallbackRequestDTO createRequestBody(List<ErrorTracking> errorTrackingList, String requestId) {
