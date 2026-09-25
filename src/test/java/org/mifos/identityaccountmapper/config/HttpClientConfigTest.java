@@ -16,8 +16,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestClient;
 
 /**
- * RestAssured followed redirects on its own, the JDK client does not. This starts a small server that answers 302 once,
- * so the swap cannot quietly drop a callback whose target moved.
+ * RestAssured followed redirects on a GET, and the client that replaces it has to as well. This starts a small server
+ * that answers 302 once, so the account-status lookup, which is a GET, keeps working when its target moves.
  */
 class HttpClientConfigTest {
 

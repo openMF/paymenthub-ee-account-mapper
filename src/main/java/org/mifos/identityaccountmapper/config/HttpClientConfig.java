@@ -1,16 +1,18 @@
 package org.mifos.identityaccountmapper.config;
 
-import java.net.http.HttpClient;
+import java.io.IOException;
+import java.net.HttpURLConnection;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.X509Certificate;
+import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLParameters;
+import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 /**
@@ -28,20 +30,25 @@ public class HttpClientConfig {
 
     @Bean
     public RestClient restClient(HttpClientProperties properties) throws NoSuchAlgorithmException, KeyManagementException {
-        // NORMAL, not the JDK default of NEVER: RestAssured followed redirects
-        // (RedirectConfig defaults to followRedirects=true, max 100), so a callback
-        // target that answers 301 or 302 has to keep working.
-        HttpClient.Builder builder = HttpClient.newBuilder().connectTimeout(properties.connectTimeout())
-                .followRedirects(HttpClient.Redirect.NORMAL);
-        if (properties.trustAll()) {
-            builder.sslContext(trustAllContext());
-            SSLParameters parameters = new SSLParameters();
-            // Null turns off hostname verification, which is the other half of what
-            // relaxedHTTPSValidation() did.
-            parameters.setEndpointIdentificationAlgorithm(null);
-            builder.sslParameters(parameters);
-        }
-        return RestClient.builder().requestFactory(new JdkClientHttpRequestFactory(builder.build())).build();
+        SSLSocketFactory trustAllSockets = properties.trustAll() ? trustAllContext().getSocketFactory() : null;
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory() {
+
+            @Override
+            protected void prepareConnection(HttpURLConnection connection, String httpMethod) throws IOException {
+                super.prepareConnection(connection, httpMethod);
+                // Both halves of what relaxedHTTPSValidation() did: accept any certificate
+                // chain, and do not check that the certificate is for the host called.
+                if (trustAllSockets != null && connection instanceof HttpsURLConnection https) {
+                    https.setSSLSocketFactory(trustAllSockets);
+                    https.setHostnameVerifier((hostname, session) -> true);
+                }
+            }
+        };
+        // Redirects are followed for GET only, which is this factory's default and
+        // matches the Apache client under RestAssured: it followed 301 and 302 only
+        // for GET and HEAD, so a PUT callback that got one was not followed then either.
+        requestFactory.setConnectTimeout(properties.connectTimeout());
+        return RestClient.builder().requestFactory(requestFactory).build();
     }
 
     private SSLContext trustAllContext() throws NoSuchAlgorithmException, KeyManagementException {
