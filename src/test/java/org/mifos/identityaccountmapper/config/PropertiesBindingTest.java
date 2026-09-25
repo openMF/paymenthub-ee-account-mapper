@@ -3,9 +3,14 @@ package org.mifos.identityaccountmapper.config;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.context.ConfigurationPropertiesAutoConfiguration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.context.properties.bind.validation.BindValidationException;
+import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
+import org.springframework.boot.test.context.assertj.AssertableApplicationContext;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
 
@@ -17,9 +22,10 @@ import org.springframework.context.annotation.Configuration;
  */
 class PropertiesBindingTest {
 
+    /** Starts from the shipped application.yml, so each test only overrides what it is about. */
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(ConfigurationPropertiesAutoConfiguration.class))
-            .withUserConfiguration(TestConfig.class);
+            .withInitializer(new ConfigDataApplicationContextInitializer()).withUserConfiguration(TestConfig.class);
 
     @Test
     void bindsTheRootLevelLookupKeysWithTheirUnderscoreSpelling() {
@@ -27,15 +33,6 @@ class PropertiesBindingTest {
             LookupProperties properties = context.getBean(LookupProperties.class);
             assertThat(properties.accountValidationEnabled()).isTrue();
             assertThat(properties.accountValidatorConnector()).isEqualTo("mojaloop");
-        });
-    }
-
-    @Test
-    void fallsBackToTheShippedDefaultsWhenNothingIsSet() {
-        runner.run(context -> {
-            LookupProperties properties = context.getBean(LookupProperties.class);
-            assertThat(properties.accountValidationEnabled()).isFalse();
-            assertThat(properties.accountValidatorConnector()).isEqualTo("gsma");
         });
     }
 
@@ -51,16 +48,6 @@ class PropertiesBindingTest {
                     assertThat(properties.client().pollInterval()).isEqualTo(10);
                     assertThat(properties.client().evenlyAllocatedMaxJobs()).isEqualTo(100);
                 });
-    }
-
-    @Test
-    void buildsTheZeebeGroupsFromDefaultsWhenTheWholeSectionIsMissing() {
-        runner.run(context -> {
-            ZeebeProperties properties = context.getBean(ZeebeProperties.class);
-            assertThat(properties.broker()).isNotNull();
-            assertThat(properties.client()).isNotNull();
-            assertThat(properties.client().maxExecutionThreads()).isEqualTo(50);
-        });
     }
 
     @Test
@@ -84,8 +71,72 @@ class PropertiesBindingTest {
         });
     }
 
+    @Test
+    void bindsEveryRecordFromTheShippedApplicationYml() {
+        runner.run(context -> {
+            assertThat(context).hasNotFailed();
+            assertThat(context.getBean(LookupProperties.class).accountValidationEnabled()).isFalse();
+            assertThat(context.getBean(ZeebeProperties.class).client().maxExecutionThreads()).isEqualTo(50);
+            assertThat(context.getBean(AccountLookupCacheProperties.class).timeToLive()).isEqualTo(3);
+            assertThat(context.getBean(AsyncProperties.class).queueCapacity()).isEqualTo(50);
+        });
+    }
+
+    /**
+     * Every key was a bare {@code @Value} before, so a missing one stopped startup. Each record is checked on its own,
+     * because which one fails first when several are missing is not deterministic.
+     */
+    @ParameterizedTest
+    @ValueSource(classes = { OnlyLookup.class, OnlyZeebe.class, OnlyAsync.class, OnlyCache.class })
+    void refusesToStartWhenTheSectionIsMissing(Class<?> onlyOneRecord) {
+        new ApplicationContextRunner().withConfiguration(AutoConfigurations.of(ConfigurationPropertiesAutoConfiguration.class))
+                .withUserConfiguration(onlyOneRecord).run(PropertiesBindingTest::failedOnValidation);
+    }
+
+    @Test
+    void refusesToStartWhenOneKeyIsMissing() {
+        new ApplicationContextRunner().withConfiguration(AutoConfigurations.of(ConfigurationPropertiesAutoConfiguration.class))
+                .withUserConfiguration(OnlyLookup.class).withPropertyValues("account_validator_connector=gsma")
+                .run(PropertiesBindingTest::failedOnValidation);
+    }
+
+    @Test
+    void refusesToStartWhenANumberIsSetToNothing() {
+        // An empty value on an Integer binds to null, so @NotNull fires, as the bare @Value did.
+        runner.withPropertyValues("zeebe.client.poll-interval=").run(PropertiesBindingTest::failedOnValidation);
+    }
+
+    @Test
+    void acceptsAStringSetToNothing() {
+        // A bare @Value accepted an empty string, and @NotNull does too: no stricter than before.
+        runner.withPropertyValues("zeebe.broker.contactpoint=").run(context -> {
+            assertThat(context).hasNotFailed();
+            assertThat(context.getBean(ZeebeProperties.class).broker().contactpoint()).isEmpty();
+        });
+    }
+
+    private static void failedOnValidation(AssertableApplicationContext context) {
+        assertThat(context).getFailure().hasRootCauseInstanceOf(BindValidationException.class);
+    }
+
     @Configuration(proxyBeanMethods = false)
     @EnableConfigurationProperties({ LookupProperties.class, ZeebeProperties.class, AsyncProperties.class,
             AccountLookupCacheProperties.class, HttpClientProperties.class })
     static class TestConfig {}
+
+    @Configuration(proxyBeanMethods = false)
+    @EnableConfigurationProperties(LookupProperties.class)
+    static class OnlyLookup {}
+
+    @Configuration(proxyBeanMethods = false)
+    @EnableConfigurationProperties(ZeebeProperties.class)
+    static class OnlyZeebe {}
+
+    @Configuration(proxyBeanMethods = false)
+    @EnableConfigurationProperties(AsyncProperties.class)
+    static class OnlyAsync {}
+
+    @Configuration(proxyBeanMethods = false)
+    @EnableConfigurationProperties(AccountLookupCacheProperties.class)
+    static class OnlyCache {}
 }
