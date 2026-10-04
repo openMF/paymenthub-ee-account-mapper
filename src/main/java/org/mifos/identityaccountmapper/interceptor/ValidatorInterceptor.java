@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.mifos.connector.common.channel.dto.PhErrorDTO;
 import org.mifos.connector.common.exception.PaymentHubErrorCategory;
@@ -22,84 +23,59 @@ import org.springframework.web.servlet.HandlerInterceptor;
 @Component
 public class ValidatorInterceptor implements HandlerInterceptor {
 
-    private static final String resource = "ValidatorInterceptor";
-    private static final String callbackURL = "X-CallbackURL";
-    private static final String registeringInstitutionId = "X-Registering-Institution-ID";
+    private static final String RESOURCE = "ValidatorInterceptor";
+    private static final String CALLBACK_URL = "X-CallbackURL";
+    private static final String REGISTERING_INSTITUTION_ID = "X-Registering-Institution-ID";
+
+    // The two controllers whose requests carry these headers. The checks were
+    // written out twice, once per controller, with identical bodies.
+    private static final Set<Class<?>> VALIDATED_CONTROLLERS = Set.of(RegisterBeneficiaryApiController.class,
+            UpdateBeneficiaryApiController.class);
+
+    private final ObjectMapper objectMapper;
+
+    public ValidatorInterceptor(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws IOException {
         log.debug("request at interceptor");
 
-        if (handler instanceof HandlerMethod) {
-            HandlerMethod handlerMethod = (HandlerMethod) handler;
-
-            if (handlerMethod.getBeanType().equals(RegisterBeneficiaryApiController.class)) {
-
-                // Using ValidatorBuilder for header validation
-                final ValidatorBuilder validatorBuilder = new ValidatorBuilder();
-                validatorBuilder.reset().resource(resource).parameter(callbackURL).value(request.getHeader(callbackURL))
-                        .isNullWithFailureCode(IdentityMapperValidatorsEnum.INVALID_CALLBACK_URL);
-
-                validatorBuilder.reset().resource(resource).parameter(registeringInstitutionId)
-                        .value(request.getHeader(registeringInstitutionId))
-                        .isNullWithFailureCode(IdentityMapperValidatorsEnum.INVALID_REGISTERING_INSTITUTION_ID);
-
-                // If errors exist, set the response and return false
-                if (validatorBuilder.hasError()) {
-                    validatorBuilder.errorCategory(PaymentHubErrorCategory.Validation.toString())
-                            .errorCode(IdentityMapperValidatorsEnum.IDENTITY_MAPPER_HEADER_VALIDATION_ERROR.getCode())
-                            .errorDescription(IdentityMapperValidatorsEnum.IDENTITY_MAPPER_HEADER_VALIDATION_ERROR.getMessage())
-                            .developerMessage(IdentityMapperValidatorsEnum.IDENTITY_MAPPER_HEADER_VALIDATION_ERROR.getMessage())
-                            .defaultUserMessage(IdentityMapperValidatorsEnum.IDENTITY_MAPPER_HEADER_VALIDATION_ERROR.getMessage());
-
-                    PhErrorDTO.PhErrorDTOBuilder phErrorDTOBuilder = new PhErrorDTO.PhErrorDTOBuilder(ExtValidationError.getErrorCode());
-                    phErrorDTOBuilder.fromValidatorBuilder(validatorBuilder);
-
-                    // Converting PHErrorDTO in JSON Format
-                    ObjectMapper objectMapper = new ObjectMapper();
-                    String jsonResponse = objectMapper.writeValueAsString(phErrorDTOBuilder.build());
-
-                    // Setting response status and writing the error message
-                    response.setHeader("Content-Type", "application/json");
-                    response.setStatus(HttpStatus.BAD_REQUEST.value());
-                    response.getWriter().write(jsonResponse);
-
-                    return false;
-                }
-            } else if (handlerMethod.getBeanType().equals(UpdateBeneficiaryApiController.class)) {
-                // Using ValidatorBuilder for header validation
-                final ValidatorBuilder validatorBuilder = new ValidatorBuilder();
-                validatorBuilder.reset().resource(resource).parameter(callbackURL).value(request.getHeader(callbackURL))
-                        .isNullWithFailureCode(IdentityMapperValidatorsEnum.INVALID_CALLBACK_URL);
-
-                validatorBuilder.reset().resource(resource).parameter(registeringInstitutionId)
-                        .value(request.getHeader(registeringInstitutionId))
-                        .isNullWithFailureCode(IdentityMapperValidatorsEnum.INVALID_REGISTERING_INSTITUTION_ID);
-
-                // If errors exist, set the response and return false
-                if (validatorBuilder.hasError()) {
-                    validatorBuilder.errorCategory(PaymentHubErrorCategory.Validation.toString())
-                            .errorCode(IdentityMapperValidatorsEnum.IDENTITY_MAPPER_HEADER_VALIDATION_ERROR.getCode())
-                            .errorDescription(IdentityMapperValidatorsEnum.IDENTITY_MAPPER_HEADER_VALIDATION_ERROR.getMessage())
-                            .developerMessage(IdentityMapperValidatorsEnum.IDENTITY_MAPPER_HEADER_VALIDATION_ERROR.getMessage())
-                            .defaultUserMessage(IdentityMapperValidatorsEnum.IDENTITY_MAPPER_HEADER_VALIDATION_ERROR.getMessage());
-
-                    PhErrorDTO.PhErrorDTOBuilder phErrorDTOBuilder = new PhErrorDTO.PhErrorDTOBuilder(ExtValidationError.getErrorCode());
-                    phErrorDTOBuilder.fromValidatorBuilder(validatorBuilder);
-
-                    // Converting PHErrorDTO in JSON Format
-                    ObjectMapper objectMapper = new ObjectMapper();
-                    String jsonResponse = objectMapper.writeValueAsString(phErrorDTOBuilder.build());
-
-                    // Setting response status and writing the error message
-                    response.setHeader("Content-Type", "application/json");
-                    response.setStatus(HttpStatus.BAD_REQUEST.value());
-                    response.getWriter().write(jsonResponse);
-
-                    return false;
-                }
-            }
+        if (!(handler instanceof HandlerMethod handlerMethod) || !VALIDATED_CONTROLLERS.contains(handlerMethod.getBeanType())) {
+            return true;
         }
-        return true;
+
+        // Using ValidatorBuilder for header validation
+        final ValidatorBuilder validatorBuilder = new ValidatorBuilder();
+        validatorBuilder.reset().resource(RESOURCE).parameter(CALLBACK_URL).value(request.getHeader(CALLBACK_URL))
+                .isNullWithFailureCode(IdentityMapperValidatorsEnum.INVALID_CALLBACK_URL);
+
+        validatorBuilder.reset().resource(RESOURCE).parameter(REGISTERING_INSTITUTION_ID)
+                .value(request.getHeader(REGISTERING_INSTITUTION_ID))
+                .isNullWithFailureCode(IdentityMapperValidatorsEnum.INVALID_REGISTERING_INSTITUTION_ID);
+
+        if (!validatorBuilder.hasError()) {
+            return true;
+        }
+
+        validatorBuilder.errorCategory(PaymentHubErrorCategory.Validation.toString())
+                .errorCode(IdentityMapperValidatorsEnum.IDENTITY_MAPPER_HEADER_VALIDATION_ERROR.getCode())
+                .errorDescription(IdentityMapperValidatorsEnum.IDENTITY_MAPPER_HEADER_VALIDATION_ERROR.getMessage())
+                .developerMessage(IdentityMapperValidatorsEnum.IDENTITY_MAPPER_HEADER_VALIDATION_ERROR.getMessage())
+                .defaultUserMessage(IdentityMapperValidatorsEnum.IDENTITY_MAPPER_HEADER_VALIDATION_ERROR.getMessage());
+
+        PhErrorDTO.PhErrorDTOBuilder phErrorDTOBuilder = new PhErrorDTO.PhErrorDTOBuilder(ExtValidationError.getErrorCode());
+        phErrorDTOBuilder.fromValidatorBuilder(validatorBuilder);
+
+        // Converting PHErrorDTO in JSON Format
+        String jsonResponse = objectMapper.writeValueAsString(phErrorDTOBuilder.build());
+
+        // Setting response status and writing the error message
+        response.setHeader("Content-Type", "application/json");
+        response.setStatus(HttpStatus.BAD_REQUEST.value());
+        response.getWriter().write(jsonResponse);
+
+        return false;
     }
 }

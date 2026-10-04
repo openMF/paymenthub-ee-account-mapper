@@ -2,42 +2,52 @@ package org.mifos.pheeidaccountvalidatorimpl.gsmaconnector;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.restassured.RestAssured;
-import io.restassured.builder.RequestSpecBuilder;
-import io.restassured.response.Response;
-import io.restassured.specification.RequestSpecification;
+import java.net.URI;
+import java.util.Map;
+import lombok.extern.slf4j.Slf4j;
 import org.mifos.pheeidaccountvalidatorimpl.service.AccountValidationService;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpRequest;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
 
-import java.util.Map;
-
-import lombok.extern.slf4j.Slf4j;
-
-@Slf4j  
+@Slf4j
 @Service(value = "gsma")
 public class GSMAAccountValidation extends AccountValidationService {
+
     @Value("${gsma-connector.contactpoint}")
     public String gsmaConnectorContactPoint;
     @Value("${gsma-connector.endpoint.account-status}")
     public String accountStatusEndpoint;
-    @Override
-    public Boolean validateAccount(String financialAddress, String tenant, String paymentModality, String payeeIdentity, String callbackURL){
-        accountStatusEndpoint = accountStatusEndpoint.replaceAll("identifierType", paymentModality);
-        //accountStatusEndpoint = accountStatusEndpoint.replaceAll("identifierId", financialAddress);
-        accountStatusEndpoint = accountStatusEndpoint.replaceAll("identifierId", payeeIdentity);
-        RequestSpecification requestSpec = new RequestSpecBuilder().build();
-        requestSpec.relaxedHTTPSValidation();
 
-        Response response = RestAssured.given(requestSpec)
-                .baseUri(gsmaConnectorContactPoint)
-                .header("Platform-TenantId", tenant)
-                .when()
-                .get(accountStatusEndpoint)
-                .andReturn();
-        Integer statusCode = response.then().extract().statusCode();
-        String responseBody = response.then().extract().body().asString();
-        ObjectMapper objectMapper = new ObjectMapper();
+    private final RestClient restClient;
+    private final ObjectMapper objectMapper;
+
+    public GSMAAccountValidation(RestClient restClient, ObjectMapper objectMapper) {
+        this.restClient = restClient;
+        this.objectMapper = objectMapper;
+    }
+
+    /** Keeps the old behaviour: the status code is read below, so a 4xx or 5xx must not throw here. */
+    private static void keepTheResponse(HttpRequest request, ClientHttpResponse response) {
+        // deliberately nothing
+    }
+
+    @Override
+    public Boolean validateAccount(String financialAddress, String tenant, String paymentModality, String payeeIdentity,
+            String callbackURL) {
+        accountStatusEndpoint = accountStatusEndpoint.replaceAll("identifierType", paymentModality);
+        // accountStatusEndpoint = accountStatusEndpoint.replaceAll("identifierId", financialAddress);
+        accountStatusEndpoint = accountStatusEndpoint.replaceAll("identifierId", payeeIdentity);
+
+        ResponseEntity<String> response = restClient.get().uri(URI.create(gsmaConnectorContactPoint + accountStatusEndpoint))
+                .header("Platform-TenantId", tenant).retrieve()
+                .onStatus(status -> true, GSMAAccountValidation::keepTheResponse).toEntity(String.class);
+
+        Integer statusCode = response.getStatusCode().value();
+        String responseBody = response.getBody();
         Map<String, String> responseMap = null;
         try {
             responseMap = objectMapper.readValue(responseBody, Map.class);
@@ -45,16 +55,20 @@ public class GSMAAccountValidation extends AccountValidationService {
             throw new RuntimeException(e);
         }
 
-// Extract the value of the "fieldName" field
+        // Left exactly as it was, on purpose. fieldValue is never used, but the AMS
+        // account-status response has no "fieldName" field, so this line throws a
+        // NullPointerException on every call and the account validation below is
+        // never reached. Removing it looks like dead-code cleanup and is not: it
+        // turns the validation back on, and the caller then reports every account
+        // as validated (AccountLookupService.accountlookupHelper returns true
+        // whatever the validator answered). Both are reported separately.
         String fieldValue = responseMap.get("fieldName").toString();
-        if(!statusCode.equals(200)) {
+        if (!statusCode.equals(200)) {
             return false;
-        } else if(statusCode.equals(200) && responseMap.get("accountStatus").equals("savingsAccountStatusType.active")){
+        } else if (statusCode.equals(200) && responseMap.get("accountStatus").equals("savingsAccountStatusType.active")) {
             return true;
-        }
-        else {
+        } else {
             return false;
         }
     }
 }
-

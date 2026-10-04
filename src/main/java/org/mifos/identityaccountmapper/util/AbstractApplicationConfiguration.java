@@ -1,7 +1,7 @@
 package org.mifos.identityaccountmapper.util;
 
 import java.util.concurrent.Executor;
-import org.springframework.beans.factory.annotation.Value;
+import org.mifos.identityaccountmapper.config.AsyncProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
@@ -13,19 +13,12 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 @ComponentScan(basePackages = "org.mifos.identityaccountmapper")
 public abstract class AbstractApplicationConfiguration {
 
-    @Value("${async.core-pool-size}")
-    public Integer corePoolSize;
-    @Value("${async.max-pool-size}")
-    public Integer maxPoolSize;
-    @Value("${async.queue-capacity}")
-    public Integer queueCapacity;
-
     @Bean(name = "asyncExecutor")
-    public Executor asyncExecutor() {
+    public Executor asyncExecutor(AsyncProperties properties) {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(corePoolSize);
-        executor.setMaxPoolSize(maxPoolSize);
-        executor.setQueueCapacity(queueCapacity);
+        executor.setCorePoolSize(properties.corePoolSize());
+        executor.setMaxPoolSize(properties.maxPoolSize());
+        executor.setQueueCapacity(properties.queueCapacity());
         executor.setThreadNamePrefix("AsyncThread-");
         executor.initialize();
         return executor;
