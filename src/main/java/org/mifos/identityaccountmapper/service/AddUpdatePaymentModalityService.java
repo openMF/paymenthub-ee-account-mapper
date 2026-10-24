@@ -19,8 +19,6 @@ import org.mifos.identityaccountmapper.repository.PaymentModalityRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.Cache;
-import org.springframework.cache.CacheManager;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -36,7 +34,7 @@ public class AddUpdatePaymentModalityService {
     @Autowired
     private BeneficiaryValidator beneficiaryValidator;
     @Autowired
-    private CacheManager cacheManager;
+    private PayeeModalityCache payeeModalityCache;
 
     @Autowired
     public AddUpdatePaymentModalityService(MasterRepository masterRepository, ErrorTrackingRepository errorTrackingRepository,
@@ -76,17 +74,6 @@ public class AddUpdatePaymentModalityService {
         return phErrorDTO;
     }
 
-    /**
-     * Drops the cached lookup for this identity. These methods are called from inside this class, which bypasses
-     * Spring's proxy, so the @CacheEvict they carried never ran and lookups kept the old modality.
-     */
-    private void evictAccountLookup(String payeeIdentity) {
-        Cache cache = cacheManager.getCache("accountLookupCache");
-        if (cache != null) {
-            cache.evict(payeeIdentity);
-        }
-    }
-
     private void sendCallback(List<ErrorTracking> errorTrackingList, String requestId, String callbackURL) {
         CallbackRequestDTO callbackRequest = sendCallbackService.createRequestBody(errorTrackingList, requestId);
 
@@ -122,7 +109,7 @@ public class AddUpdatePaymentModalityService {
                     paymentModality.setInstitutionCode(beneficiary.getBankingInstitutionCode());
                 }
                 paymentModalityRepository.save(paymentModality);
-                evictAccountLookup(payeeIdentity);
+                payeeModalityCache.evict(payeeIdentity, registeringInstitutionId);
             }
         } catch (Exception e) {
             saveError(requestID, beneficiary, e.getMessage(), errorTrackingList);
@@ -156,7 +143,7 @@ public class AddUpdatePaymentModalityService {
                         paymentModality.setInstitutionCode(beneficiary.getBankingInstitutionCode());
                     }
                     paymentModalityRepository.save(paymentModality);
-                    evictAccountLookup(payeeIdentity);
+                    payeeModalityCache.evict(payeeIdentity, registeringInstitutionId);
                 }
             }
         } catch (Exception e) {
