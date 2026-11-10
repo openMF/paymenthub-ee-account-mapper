@@ -40,6 +40,9 @@ dependencies {
 
     implementation 'org.springframework.boot:spring-boot-starter'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    // MySQL for the Flyway migration tests (versions from spring-boot-dependencies via the BOM)
+    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.testcontainers:mysql'
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     // Bean Validation provider for the @Validated configuration records; without one every bind fails.
